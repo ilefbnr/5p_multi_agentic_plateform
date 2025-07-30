@@ -1,0 +1,25 @@
+#uv pip install git+https://github.com/tavily-ai/tavily-python.git
+mcp
+acceterate
+requests
+beautifulsoup4
+playwright
+aiohttp
+openai
+google-generativeai
+pydantic
+python-dotenv
+PyYAML
+langchain 
+langchain-core 
+langchain-community 
+deepseek
+langgraph
+pandas 
+phonenumbers 
+spacy
+faiss-cpu 
+sentence-transformers 
+transformers
+sentencepiece
+langchain_groq
