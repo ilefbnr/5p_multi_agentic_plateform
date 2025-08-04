@@ -11,6 +11,10 @@ from langchain_groq import ChatGroq
 from langchain_community.embeddings import HuggingFaceBgeEmbeddings
 from langchain_community.vectorstores import FAISS
 import os
+import json
+import re
+from datetime import datetime
+from typing import List, Dict, Tuple, Optional
 import traceback
 
 load_dotenv()
@@ -115,21 +119,157 @@ def get_llm_instance():
 
 
 def get_rag_chain(retriever, llm, question):
-    template = """"
-        Analyze this competitive intelligence data using Porter's Force:
+    # template = """"
+    #     Analyze this competitive intelligence data using Porter's Force:
 
-        Context:
-        {context}
+    #     Context:
+    #     {context}
 
-        Generate a report with:
-        - Threat Score (1-10)
-        - Key Trends (bullet points)
-        - Strategic Recommendations
-        - Dashboard Metadata (sources, confidence)
+    #     Generate a report with:
+    #     - Threat Score (1-10)
+    #     - Key Trends (bullet points)
+    #     - Strategic Recommendations
+    #     - Dashboard Metadata (sources, confidence)
         
-        Question: {question}
+    #     Question: {question}     
     
+    # """
+    PORTER_FORCE_TEMPLATES = {
+    "Competitive Rivalry": """
+            Analyze competitive rivalry in FinTech using:
+            {context}
+            
+            Extract and calculate:
+            1. Market Concentration Score (1-10) based on:
+               - Number of competitors mentioned
+               - Market share percentages
+               - Growth rate comparisons
+            
+            2. Trend Analysis:
+               - Identify 3 key trends with supporting statistics
+               - Calculate trend velocity (change over time)
+            
+            3. Financial Health Indicators:
+               - Profit margins mentioned
+               - Investment amounts
+               - Revenue growth rates
+            
+            4. Competitive Strategy Recommendations
+            """,
+    
+    "Buyer Power": """
+            Analyze the buyer power dynamics in FinTech using:
+            {context}
+            
+            Extract and calculate:
+            1. Customer Concentration Score (1-10) based on:
+               - Number of major customers mentioned
+               - Switching cost indicators
+               - Price sensitivity evidence
+            
+            2. Lead Scoring Model:
+               - Intent signals (frequency of buying-related terms)
+               - Engagement metrics (references to interactions)
+               - Budget indicators (dollar amounts mentioned)
+            
+            3. Financial Metrics:
+               - Extract all numerical data (percentages, dollar amounts)
+               - Calculate average customer acquisition cost if possible
+            
+            4. Strategic Recommendations:
+               - Customer retention strategies
+               - Pricing model adjustments
+            """,
+    
+    "Supplier Power": """
+            Analyze supplier power in FinTech using:
+            {context}
+            
+            Extract and calculate:
+            1. Supplier Criticality Score (1-10):
+               - Number of alternative suppliers mentioned
+               - Switching cost indicators
+               - Unique technology dependencies
+            
+            2. Cost Structure Analysis:
+               - Extract all cost-related figures
+               - Calculate cost volatility if possible
+            
+            3. Risk Assessment:
+               - Single points of failure
+               - Contract duration mentions
+            """,
+    
+    "Threat of Substitutes": """
+            Analyze substitution threats in FinTech:
+            - Traditional finance alternatives
+            - Blockchain/crypto alternatives
+            - Emerging tech disruptions
+
+            Context:
+            {context}
+
+            Generate:
+            1. SUBSTITUTION THREAT SCORE (1-10) based on:
+                - Relative price performance
+                - Switching willingness
+                - Feature parity
+
+            2. DISRUPTION ANALYSIS:
+                - Technology adoption curves
+                - Regulatory shifts
+                - Consumer behavior changes
+
+            3. INNOVATION ROADMAP:
+                - Defensive R&D priorities
+                - Strategic partnerships
+                - Ecosystem development
+
+            4. DASHBOARD METRICS:
+                - Alternative solution growth rates
+                - Customer preference shifts
+                - Cross-industry threat matrix
+    """,
+    
+    "Threat of New Entrants": """
+            Evaluate market entry barriers:
+            - Regulatory hurdles
+            - Capital requirements
+            - Incumbent advantages
+
+            Context:
+            {context}
+
+            Generate:
+            1. ENTRY THREAT SCORE (1-10) based on:
+                - Regulatory complexity
+                - Minimum efficient scale
+                - Brand dominance
+
+            2. ENTRANT PROFILING:
+                - Likely player types
+                - Potential entry vectors
+                - Timing projections
+
+            3. DEFENSIVE STRATEGIES:
+                - Barrier strengthening
+                - Early acquisition targets
+                - Regulatory engagement
+
+            4. DASHBOARD METRICS:
+                - New FinTech licenses issued
+                - Venture capital inflows 
+                - Patent activity trends
     """
+}
+    def get_force_template(force_name: str, context: str) -> str:
+        template = PORTER_FORCE_TEMPLATES.get(force_name.split("Force")[0].strip())
+        if not template:
+            raise ValueError(f"Unknown Porter Force: {force_name}")
+        return template.format(context=context)
+    
+    template = get_force_template("Buyer Power Force", "{context}")
+
     prompt = ChatPromptTemplate.from_template(template)
 
     rag_chain = (
@@ -172,8 +312,14 @@ def get_response(index_name, index_path, query):
         print(traceback.format_exc())
         return {"status": False, "message":f"Exception occurred : {e}"}
 
-
-
+def save_report(report: Dict, file_path: str):
+    try:
+        with open(file_path, 'w') as f:
+            json.dump(report, f, indent=4)
+        return {"status": True, "message": "Report saved successfully."}
+    except Exception as e:
+        print(f"Failed to save report: {e}")
+        return {"status": False, "message": f"Failed to save report: {e}"}
 
 
 if __name__ == "__main__":
@@ -190,4 +336,10 @@ if __name__ == "__main__":
     query = "Analyze this competitive intelligence data using Porter's Buyer's Power Force"
     rag_chain = get_rag_chain(retriever, llm, query)
     response = rag_chain.invoke(query)
+    save_report_response = save_report(response, "data/report/report.json")
+    if save_report_response["status"]:
+        print("Report saved successfully.")
+    else:
+        print("Failed to save report:", save_report_response["message"])
+
     print(response)
